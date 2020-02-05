@@ -1,28 +1,33 @@
 #include <Arduino.h>
-#include <Arduino.h>
 #include <SPI.h>
 #include <lmic.h>
 #include <hal/hal.h>
 #include <WiFi.h>
-#include <CayenneLPP.h>
 #include <Wire.h>
 #include <Adafruit_BME280.h>
 
 // LoRaWAN NwkSKey, network session key
 // This is the default Semtech key, which is used by the early prototype TTN
 // network.
-static PROGMEM u1_t NWKSKEY[16] = { 0x66, 0x52, 0x89, 0x28, 0xA5, 0x99, 0x80, 0xEF, 0xF0, 0xF8, 0xEC, 0x0E, 0x3E, 0x25, 0x96, 0x2D }; // LoRaWAN NwkSKey, network session key 
-static u1_t PROGMEM APPSKEY[16] = { 0xBE, 0xEA, 0x9A, 0x4F, 0xD5, 0xC8, 0x58, 0xC9, 0xFF, 0x91, 0xF1, 0x4E, 0xAF, 0x98, 0xD3, 0x67 }; // LoRaWAN AppSKey, application session key 
-static const u4_t DEVADDR = 0x26021383; 
 
+static const u1_t PROGMEM DEVEUI[8]= { 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+void os_getDevEui (u1_t* buf) { memcpy_P(buf, DEVEUI, 8);}
+
+// Copy the value from Application EUI from the TTN console in LSB mode
+static const u1_t PROGMEM APPEUI[8]= { 0x0B, 0x74, 0x02, 0xD0, 0x7E, 0xD5, 0xB3, 0x70 };
+void os_getArtEui (u1_t* buf) { memcpy_P(buf, APPEUI, 8);}
+
+// This key should be in big endian format (or, since it is not really a
+// number but a block of memory, endianness does not really apply). In
+// practice, a key taken from ttnctl can be copied as-is. Anyway its in MSB mode.
+static const u1_t PROGMEM APPKEY[16] ={ 0x31, 0xA3, 0x6B, 0x49, 0x34, 0xDD, 0xE2, 0x51, 0x01, 0x1B, 0xD4, 0x39, 0xC9, 0x3F, 0x83, 0xD7 };
+void os_getDevKey (u1_t* buf) { memcpy_P(buf, APPKEY, 16);}
 // These callbacks are only used in over-the-air activation, so they are
 // left empty here (we cannot leave them out completely unless
 // DISABLE_JOIN is set in config.h, otherwise the linker will complain).
-void os_getArtEui (u1_t* buf) { }
-void os_getDevEui (u1_t* buf) { }
-void os_getDevKey (u1_t* buf) { }
 
-static uint8_t mydata[4];
+
+static uint8_t mydata[3];
 static osjob_t sendjob;
 static osjob_t KeepAlive;
 void do_send(osjob_t* j); // declaration of send function
@@ -44,7 +49,13 @@ const lmic_pinmap lmic_pins = {
 const int Trigger = 2;   //Pin digital 2 para el Trigger del sensor
 const int Echo = 13;   //Pin digital 3 para el Echo del sensor
 const int BATTERY_PIN = 35;
-const int CONTROL_PIN = 14;
+const int LED_OCUPADO = 14;
+const int LED_LIBRE = 25;
+bool cambio = false;
+bool estado = false; // true ocupado, false libre
+const int SENSIBILIDAD = 100;
+ostime_t ultimoCambio = os_getTime();
+
 
 float vBat;
 
@@ -67,22 +78,17 @@ void imprimirBuffer()
   Serial.println(mydata[0]);
   Serial.print("Distancia: ");
   Serial.println(mydata[1]);
-  Serial.print("Control: ");
-  Serial.println(mydata[2]);
   Serial.print("Bateria: ");
-  Serial.println(mydata[3]);
+  Serial.println(mydata[2]);
 }
 
 float getBatteryVoltage() {
   // we've set 10-bit ADC resolution 2^10=1024 and voltage divider makes it half of maximum readable value (which is 3.3V)
-  vBat = analogRead(BATTERY_PIN) * 2.0 * (3.3 / 1024.0);
+  vBat = analogRead(BATTERY_PIN) * 2.0 * (3.3 / 4096.0);
   return vBat;  
 }
 
-int getAnalogControl()
-{
-  return (analogRead(CONTROL_PIN)/40.95);
-}
+
 
 void onEvent (ev_t ev) {
     Serial.print(os_getTime());
@@ -150,10 +156,8 @@ void onEvent (ev_t ev) {
 }
 void keep_alive(osjob_t* j){
   mydata[0] = 1;
-  mydata[1] = 1;
-  mydata[2] = 1;
-  mydata[3] = 1;
-  LMIC_setTxData2(1, mydata, 4, 0);
+
+  LMIC_setTxData2(2, mydata, 1, 0);
   Serial.println(F("keep alive queued"));
   os_setTimedCallback(&KeepAlive, os_getTime()+sec2osticks(KA_INTERVAL), keep_alive);
 }
@@ -163,7 +167,7 @@ void do_send(osjob_t* j){
         Serial.println(F("OP_TXRXPEND, not sending"));
     } else {
         // Prepare upstream data transmission at the next possible time.
-        if (calcularDistancia() < getAnalogControl())
+        if (!estado)
         {
           mydata[0] = 1;
         }else
@@ -171,9 +175,8 @@ void do_send(osjob_t* j){
           mydata[0] = 0;
         }
         mydata[1] = calcularDistancia();
-        mydata[2] = getAnalogControl();
-        mydata[3] = getBatteryVoltage();
-        LMIC_setTxData2(1, mydata, 4, 0);
+        mydata[2] = getBatteryVoltage();
+        LMIC_setTxData2(1, mydata, 3, 0);
         imprimirBuffer();
         Serial.println(F("Packet queued"));
     }
@@ -188,6 +191,8 @@ void setup()
   adcStart(BATTERY_PIN);
   pinMode(Trigger, OUTPUT); //pin como salida
   pinMode(Echo, INPUT);  //pin como entrada
+  pinMode(LED_LIBRE, OUTPUT);
+  pinMode(LED_OCUPADO, OUTPUT);
   digitalWrite(Trigger, LOW);//Inicializamos el pin con 0
 
   // LMIC init
@@ -197,15 +202,9 @@ void setup()
 
   // Set static session parameters. Instead of dynamically establishing a session
   // by joining the network, precomputed session parameters are be provided.
-  #ifdef PROGMEM
-  // On AVR, these values are stored in flash and only copied to RAM
-  // once. Copy them to a temporary buffer here, LMIC_setSession will
-  // copy them into a buffer of its own again.
-  LMIC_setSession (0x1, DEVADDR, NWKSKEY, APPSKEY);
-  #else
-  // If not running an AVR with PROGMEM, just use the arrays directly
-  LMIC_setSession (0x1, DEVADDR, NWKSKEY, APPSKEY);
-  #endif
+   // Reset the MAC state. Session and pending data transfers will be discarded.
+  LMIC_reset();
+  LMIC_setClockError(MAX_CLOCK_ERROR * 1 / 100);
 
   #if defined(CFG_eu868)
   #elif defined(CFG_us915)
@@ -230,28 +229,31 @@ void setup()
   keep_alive(&KeepAlive);
 }
 
-bool cambio = false;
-bool estado = false; // true ocupado, false libre
-ostime_t ultimoCambio = os_getTime();
+
 
 void loop()
 {
   os_runloop_once();
   //Serial.print(calcularDistancia());
-  if (estado && (ultimoCambio + sec2osticks(10) < os_getTime()) && (calcularDistancia() > 100))
+  if (estado && (ultimoCambio + sec2osticks(10) < os_getTime()) && (calcularDistancia() > SENSIBILIDAD))
   {
     ultimoCambio = os_getTime();
     Serial.println("ocurrio un cambio negativo");
     estado = false;
     cambio = true;
+    digitalWrite(LED_LIBRE,HIGH);
+    digitalWrite(LED_OCUPADO,LOW);
+
   }
   
-  if (!estado && (ultimoCambio + sec2osticks(10) < os_getTime()) && (calcularDistancia() < 100))
+  if (!estado && (ultimoCambio + sec2osticks(10) < os_getTime()) && (calcularDistancia() < SENSIBILIDAD))
   {
     ultimoCambio = os_getTime();
     Serial.println("ocurrio un cambio positivo");
     estado = true;
     cambio = true;
+    digitalWrite(LED_LIBRE,LOW);
+    digitalWrite(LED_OCUPADO,HIGH);    
   }
 
   if (cambio)
