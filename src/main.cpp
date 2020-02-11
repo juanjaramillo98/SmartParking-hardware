@@ -4,7 +4,6 @@
 #include <hal/hal.h>
 #include <WiFi.h>
 #include <Wire.h>
-#include <Adafruit_BME280.h>
 
 // LoRaWAN NwkSKey, network session key
 // This is the default Semtech key, which is used by the early prototype TTN
@@ -54,6 +53,7 @@ const int LED_LIBRE = 25;
 bool cambio = false;
 bool estado = false; // true ocupado, false libre
 const int SENSIBILIDAD = 100;
+int distancia;
 ostime_t ultimoCambio = os_getTime();
 
 
@@ -68,7 +68,7 @@ long calcularDistancia()
   delayMicroseconds(10);          //Enviamos un pulso de 10us
   digitalWrite(Trigger, LOW);
   
-  t = pulseIn(Echo, HIGH); //obtenemos el ancho del pulso
+  t = pulseIn(Echo, HIGH,140000); //obtenemos el ancho del pulso
   d = t/59;             //escalamos el tiempo a una distancia en cm
   return d;
 }
@@ -175,7 +175,7 @@ void do_send(osjob_t* j){
           mydata[0] = 0;
         }
         mydata[1] = calcularDistancia();
-        mydata[2] = getBatteryVoltage();
+        mydata[2] = getBatteryVoltage()*10;
         LMIC_setTxData2(1, mydata, 3, 0);
         imprimirBuffer();
         Serial.println(F("Packet queued"));
@@ -234,11 +234,12 @@ void setup()
 void loop()
 {
   os_runloop_once();
+  distancia = calcularDistancia();
   //Serial.print(calcularDistancia());
-  if (estado && (ultimoCambio + sec2osticks(10) < os_getTime()) && (calcularDistancia() > SENSIBILIDAD))
+  if (estado && (ultimoCambio + sec2osticks(10) < os_getTime()) && ((distancia > SENSIBILIDAD)||( distancia = 0 )))
   {
     ultimoCambio = os_getTime();
-    Serial.println("ocurrio un cambio negativo");
+    Serial.println("Se desocupo");
     estado = false;
     cambio = true;
     digitalWrite(LED_LIBRE,HIGH);
@@ -246,7 +247,7 @@ void loop()
 
   }
   
-  if (!estado && (ultimoCambio + sec2osticks(10) < os_getTime()) && (calcularDistancia() < SENSIBILIDAD))
+  if (!estado && (ultimoCambio + sec2osticks(10) < os_getTime()) && ((distancia < SENSIBILIDAD)&&(distancia > 0)))
   {
     ultimoCambio = os_getTime();
     Serial.println("ocurrio un cambio positivo");
