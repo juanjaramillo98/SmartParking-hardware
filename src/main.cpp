@@ -9,28 +9,28 @@
 // This is the default Semtech key, which is used by the early prototype TTN
 // network.
 
-static const u1_t PROGMEM DEVEUI[8]={ 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-void os_getDevEui (u1_t* buf) { memcpy_P(buf, DEVEUI, 8);}
+// static const u1_t PROGMEM DEVEUI[8]={ 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+// void os_getDevEui (u1_t* buf) { memcpy_P(buf, DEVEUI, 8);}
 
-// Copy the value from Application EUI from the TTN console in LSB mode
-static const u1_t PROGMEM APPEUI[8]= { 0x0B, 0x74, 0x02, 0xD0, 0x7E, 0xD5, 0xB3, 0x70 };
-void os_getArtEui (u1_t* buf) { memcpy_P(buf, APPEUI, 8);}
+// // Copy the value from Application EUI from the TTN console in LSB mode
+// static const u1_t PROGMEM APPEUI[8]= { 0x0B, 0x74, 0x02, 0xD0, 0x7E, 0xD5, 0xB3, 0x70 };
+// void os_getArtEui (u1_t* buf) { memcpy_P(buf, APPEUI, 8);}
 
-// This key should be in big endian format (or, since it is not really a
-// number but a block of memory, endianness does not really apply). In
-// practice, a key taken from ttnctl can be copied as-is. Anyway its in MSB mode.
-static const u1_t PROGMEM APPKEY[16] ={ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
-void os_getDevKey (u1_t* buf) { memcpy_P(buf, APPKEY, 16);}
-// // These callbacks are only used in over-the-air activation, so they are
-// // left empty here (we cannot leave them out completely unless
-// // DISABLE_JOIN is set in config.h, otherwise the linker will complain).
+// // This key should be in big endian format (or, since it is not really a
+// // number but a block of memory, endianness does not really apply). In
+// // practice, a key taken from ttnctl can be copied as-is. Anyway its in MSB mode.
+// static const u1_t PROGMEM APPKEY[16] ={ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
+// void os_getDevKey (u1_t* buf) { memcpy_P(buf, APPKEY, 16);}
+// // // These callbacks are only used in over-the-air activation, so they are
+// // // left empty here (we cannot leave them out completely unless
+// // // DISABLE_JOIN is set in config.h, otherwise the linker will complain).
 
-// static PROGMEM u1_t NWKSKEY[16] = { 0x98, 0x52, 0xA5, 0x7A, 0x8E, 0xD7, 0x0B, 0x22, 0xE1, 0x94, 0xAF, 0x3E, 0xCB, 0x70, 0x99, 0x5E };// LoRaWAN NwkSKey, network session key 
-// static u1_t PROGMEM APPSKEY[16] = { 0xF2, 0x7B, 0xB7, 0xC2, 0x17, 0xA7, 0x79, 0x9E, 0x0A, 0x6B, 0x12, 0x74, 0x6F, 0xC4, 0x0B, 0x91 }; // LoRaWAN AppSKey, application session key 
-// static const u4_t DEVADDR = 0x26021B38 ; // LoRaWAN end-device address (DevAddr)
-// void os_getArtEui (u1_t* buf) { }
-// void os_getDevEui (u1_t* buf) { }
-// void os_getDevKey (u1_t* buf) { }
+static PROGMEM u1_t NWKSKEY[16] = { 0x98, 0x52, 0xA5, 0x7A, 0x8E, 0xD7, 0x0B, 0x22, 0xE1, 0x94, 0xAF, 0x3E, 0xCB, 0x70, 0x99, 0x5E };// LoRaWAN NwkSKey, network session key 
+static u1_t PROGMEM APPSKEY[16] = { 0xF2, 0x7B, 0xB7, 0xC2, 0x17, 0xA7, 0x79, 0x9E, 0x0A, 0x6B, 0x12, 0x74, 0x6F, 0xC4, 0x0B, 0x91 }; // LoRaWAN AppSKey, application session key 
+static const u4_t DEVADDR = 0x26021B38 ; // LoRaWAN end-device address (DevAddr)
+void os_getArtEui (u1_t* buf) { }
+void os_getDevEui (u1_t* buf) { }
+void os_getDevKey (u1_t* buf) { }
 
 
 static uint8_t mydata[3];
@@ -208,12 +208,12 @@ void setup()
   // Reset the MAC state. Session and pending data transfers will be discarded.
   LMIC_reset();
 
-  //LMIC_setSession (0x1, DEVADDR, NWKSKEY, APPSKEY);
+  LMIC_setSession (0x1, DEVADDR, NWKSKEY, APPSKEY);
 
   // Set static session parameters. Instead of dynamically establishing a session
   // by joining the network, precomputed session parameters are be provided.
    // Reset the MAC state. Session and pending data transfers will be discarded.
-  LMIC_setClockError(MAX_CLOCK_ERROR * 1 / 100);
+  //LMIC_setClockError(MAX_CLOCK_ERROR * 1 / 100);
 
   #if defined(CFG_eu868)
   #elif defined(CFG_us915)
