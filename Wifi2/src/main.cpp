@@ -7,18 +7,18 @@
 //**************************************
 //*********** WIFICONFIG ***************
 //**************************************
-const char *ssid = "juanpablo";
-const char *password = "70577893";
+const char *ssid = "mqtt";
+const char *password = "triangulo13";
 
 //**************************************
 //*********** MQTT CONFIG **************
 //**************************************
-const char *mqtt_server = "ioticos.org";
+const char *mqtt_server = "161.35.1.106";
 const int mqtt_port = 1883;
-const char *mqtt_user = "zoAdbG2cjLqF3bm";
-const char *mqtt_pass = "Zy0DXgPoIrDEYZr";
-const char *root_topic_subscribe = "JubZ2d6exOOS2CV/sub/parqueadero18_1";
-const char *root_topic_publish = "JubZ2d6exOOS2CV/pub/";
+const char *mqtt_user = "integrador";
+const char *mqtt_pass = "integrador";
+const char *root_topic_subscribe = "parking/sub/parqueadero18_1";
+const char *root_topic_publish = "parking/pub";
 
 //**************************************
 //*********** GLOBALES   ***************
